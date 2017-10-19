@@ -6,9 +6,9 @@ put melons in a shopping cart.
 Authors: Joel Burton, Christian Fernandez, Meggie Mahnken, Katie Byers.
 """
 
-from flask import Flask, render_template, redirect, flash, session
+from flask import Flask, render_template, redirect, flash, session, request
 import jinja2
-
+import customers
 import melons
 
 app = Flask(__name__)
@@ -76,8 +76,11 @@ def show_shopping_cart():
     # Make sure your function can also handle the case wherein no cart has
     # been added to the session
 
-    
-    return render_template("cart.html")
+    total = 0
+    for melon in session['cart']:
+        total += session['cart'][melon]['sub_total']
+
+    return render_template("cart.html", total=total)
 
 
 @app.route("/add_to_cart/<melon_id>")
@@ -100,17 +103,15 @@ def add_to_cart(melon_id):
     # - redirect the user to the cart page
 
     melon = melons.get_by_id(melon_id)
-
     session['cart'] = session.get('cart', {})
-    if melon.melon_id not in session['cart'][melon_id]:
-        session['cart'][melon_id] = {'common_name': melon.common_name,
-                                     'price': melon.price,
-                                     'quantity': 1,
-                                    }
-    else:
-        session['cart'][melon_id][quantity] += 1
 
-    flash("Congratulations, your " + session['cart'][melon_id][common_name] +
+    session['cart'][melon_id] = session['cart'].get(melon_id, {'common_name': melon.common_name,
+                                        'price': float(melon.price),'quantity': 0, 'sub_total': 0,})
+    print session['cart']
+    session['cart'][melon_id]['quantity'] += 1
+    session['cart'][melon_id]['sub_total'] += session['cart'][melon_id]['price']
+
+    flash("Congratulations, your " + session['cart'][melon_id]['common_name'] +
          " has been added to the cart.")
 
     return redirect("/cart")
@@ -145,7 +146,20 @@ def process_login():
     # - if they don't, flash a failure message and redirect back to "/login"
     # - do the same if a Customer with that email doesn't exist
 
-    return "Oops! This needs to be implemented"
+    username = request.form['email']
+    password = request.form['password']
+    customer = customers.get_by_email(username)
+
+    if customer:
+        if password == customer.password:
+            flash("You are logged in!")
+            return redirect('/melons')
+        else:
+            flash("Wrong Password")
+            return redirect('/login')
+    else:
+        flash("Are you sure that is your email?")
+        return redirect('/login')
 
 
 @app.route("/checkout")
